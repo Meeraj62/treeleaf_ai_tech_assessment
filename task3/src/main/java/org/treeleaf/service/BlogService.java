@@ -6,7 +6,10 @@ import org.treeleaf.dto.BlogDto;
 import org.treeleaf.dto.CommentDto;
 import org.treeleaf.entity.Blog;
 import org.treeleaf.entity.Comment;
+import org.treeleaf.entity.Role;
 import org.treeleaf.entity.User;
+import org.treeleaf.exception.AccessDeniedException;
+import org.treeleaf.exception.ResourceNotFoundException;
 import org.treeleaf.repository.BlogRepository;
 import org.treeleaf.repository.CommentRepository;
 
@@ -29,7 +32,6 @@ public class BlogService {
         blog.setContent(dto.getContent());
         blog.setThumbnailUrl(dto.getThumbnailUrl());
         blog.setAuthor(author);
-
         return blogRepository.save(blog);
     }
 
@@ -37,30 +39,46 @@ public class BlogService {
         return blogRepository.findAll();
     }
 
-    public Blog updateBlog(Long id, BlogDto dto) {
+    public Blog updateBlog(Long id, BlogDto dto, User user) {
         Blog blog = blogRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Blog not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Blog not found"));
+
+        if (!blog.getAuthor().equals(user) && user.getRole() != Role.ADMIN) {
+            throw new AccessDeniedException("Not authorized to update this blog");
+        }
 
         blog.setTitle(dto.getTitle());
         blog.setContent(dto.getContent());
         blog.setThumbnailUrl(dto.getThumbnailUrl());
-
         return blogRepository.save(blog);
     }
 
-    public void deleteBlog(Long id) {
-        blogRepository.deleteById(id);
+    public void deleteBlog(Long id, User user) {
+        Blog blog = blogRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Blog not found"));
+
+        if (!blog.getAuthor().equals(user) && user.getRole() != Role.ADMIN) {
+            throw new AccessDeniedException("Not authorized to delete this blog");
+        }
+
+        blogRepository.delete(blog);
     }
 
-    public Comment addComment(Long blogId, CommentDto dto, User author) {
+    public Comment addComment(Long blogId, CommentDto dto, User user) {
         Blog blog = blogRepository.findById(blogId)
-                .orElseThrow(() -> new IllegalArgumentException("Blog not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Blog not found"));
 
         Comment comment = new Comment();
         comment.setContent(dto.getContent());
+        comment.setAuthor(user);
         comment.setBlog(blog);
-        comment.setAuthor(author);
-
         return commentRepository.save(comment);
     }
+
+    public List<Comment> getCommentsByBlog(Long blogId) {
+        Blog blog = blogRepository.findById(blogId)
+                .orElseThrow(() -> new ResourceNotFoundException("Blog not found"));
+        return commentRepository.findByBlog(blog);
+    }
+
 }

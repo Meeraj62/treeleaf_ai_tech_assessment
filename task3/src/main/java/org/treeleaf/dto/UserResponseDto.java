@@ -1,9 +1,9 @@
 package org.treeleaf.dto;
 
 import lombok.Data;
+import org.treeleaf.entity.Permission;
 import org.treeleaf.entity.Role;
 
-import java.security.Permission;
 import java.util.List;
 
 @Data

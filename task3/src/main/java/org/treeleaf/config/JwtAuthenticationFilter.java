@@ -1,6 +1,5 @@
 package org.treeleaf.config;
 
-import io.jsonwebtoken.*;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -16,28 +15,23 @@ import org.treeleaf.service.UserService;
 import java.io.IOException;
 
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
-    private final String jwtSecret;
-
+    private final JwtTokenProvider tokenProvider;
     private final UserService userService;
 
-    public JwtAuthenticationFilter(String jwtSecret, UserService userService) {
-        this.jwtSecret = jwtSecret;
+    public JwtAuthenticationFilter(JwtTokenProvider tokenProvider, UserService userService) {
+        this.tokenProvider = tokenProvider;
         this.userService = userService;
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-            throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
+                                    FilterChain filterChain) throws ServletException, IOException {
         try {
             String jwt = getJwtFromRequest(request);
 
-            if (StringUtils.hasText(jwt) && validateJwtToken(jwt)) {
-                Claims claims = Jwts.parser()
-                        .setSigningKey(jwtSecret)
-                        .parseClaimsJws(jwt)
-                        .getBody();
-
-                UserDetails userDetails = userService.loadUserByUsername(claims.getSubject());
+            if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
+                String username = tokenProvider.getUsernameFromJWT(jwt);
+                UserDetails userDetails = userService.loadUserByUsername(username);
 
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
@@ -45,8 +39,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }
-        } catch (Exception e) {
-            logger.error("Cannot set user authentication: {}", e);
+        } catch (Exception ex) {
+            logger.error("Could not set user authentication in security context", ex);
         }
 
         filterChain.doFilter(request, response);
@@ -58,14 +52,5 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return bearerToken.substring(7);
         }
         return null;
-    }
-
-    private boolean validateJwtToken(String jwt) {
-        try {
-            Jwts.parser().setSigningKey(jwtSecret).parseClaimsJws(jwt);
-            return true;
-        } catch (MalformedJwtException | ExpiredJwtException | UnsupportedJwtException | IllegalArgumentException e) {
-            return false;
-        }
     }
 }

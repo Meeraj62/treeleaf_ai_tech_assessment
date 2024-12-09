@@ -4,7 +4,7 @@ public enum Permission {
     READ_BLOG,
     WRITE_BLOG,
     DELETE_BLOG,
-    MANAGE_USERS;
+    WRITE_COMMENT;
 
     @Override
     public String toString() {
